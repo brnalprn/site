@@ -1,46 +1,576 @@
 <!DOCTYPE html>
 <html lang="tr" class="dark">
-  <head>
+<head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>portaSearch</title>
+    
+    <!-- Libraries (No Build Step Required) -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind Config -->
     <script>
       tailwind.config = {
         darkMode: 'class',
         theme: {
           extend: {
-            fontFamily: {
-              sans: ['Inter', 'sans-serif'],
-            },
+            fontFamily: { sans: ['Inter', 'sans-serif'] },
             colors: {
-              brand: {
-                50: '#fff7ed',
-                100: '#ffedd5',
-                500: '#f97316',
-                600: '#ea580c',
-                700: '#c2410c',
-                900: '#7c2d12',
-              }
+              brand: { 500: '#f97316' }
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.3s ease-out',
+              'slide-up': 'slideUp 0.4s ease-out'
+            },
+            keyframes: {
+              fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+              slideUp: { '0%': { transform: 'translateY(10px)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } }
             }
           }
         }
       }
     </script>
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "canvas-confetti": "https://esm.sh/canvas-confetti@1.9.2"
-  }
-}
-</script>
+    
+    <style>
+        /* Custom Scrollbar for Dictionary Grid */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        .glass-header { background: rgba(2, 6, 23, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+    </style>
 </head>
-  <body class="bg-slate-950 text-slate-100 antialiased selection:bg-orange-500 selection:text-white">
-    <div id="root"></div>
-  </body>
+<body class="bg-slate-950 text-slate-100 antialiased min-h-screen flex flex-col selection:bg-orange-500 selection:text-white relative overflow-x-hidden">
+
+    <!-- Background Effect -->
+    <div class="fixed inset-0 -z-10 h-full w-full bg-slate-950 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:20px_20px] [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-20 pointer-events-none"></div>
+
+    <!-- HEADER -->
+    <header class="sticky top-0 z-50 w-full border-b border-slate-800 glass-header transition-all duration-300">
+        <div class="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 lg:px-8 gap-4">
+            
+            <!-- Logo -->
+            <div class="flex items-center gap-3 shrink-0 select-none cursor-pointer" onclick="window.location.reload()">
+                <div class="relative flex h-10 w-10 items-center justify-center shrink-0">
+                    <svg viewBox="0 0 100 100" class="h-full w-full drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]">
+                        <circle cx="50" cy="50" r="45" fill="#f97316" />
+                        <circle cx="70" cy="30" r="10" fill="#fb923c" fillOpacity="0.6" />
+                        <path d="M50 5 Q50 -10 70 5 Q50 5 50 5" fill="#22c55e" />
+                        <path d="M20 45 H45 V55 A10 10 0 0 1 20 55 Z" fill="#1e293b" />
+                        <path d="M55 45 H80 V55 A10 10 0 0 1 55 55 Z" fill="#1e293b" />
+                        <rect x="45" y="48" width="10" height="3" fill="#1e293b" />
+                    </svg>
+                </div>
+                <span class="hidden sm:block text-2xl font-bold tracking-tight text-white">
+                    porta<span class="text-orange-500">Search</span>
+                </span>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="flex-1 max-w-2xl px-2 sm:px-6">
+                <div class="relative w-full group">
+                    <div class="absolute inset-y-0 left-1.5 flex items-center pointer-events-none z-10">
+                        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-800 group-focus-within:bg-orange-500/20 transition-colors">
+                            <i data-lucide="search" class="h-4 w-4 text-slate-400 group-focus-within:text-orange-500 transition-colors"></i>
+                        </div>
+                    </div>
+                    <input type="text" id="searchInput" placeholder="Ara..." autocomplete="off"
+                        class="block w-full rounded-full border border-slate-700 bg-slate-900 py-3 pl-12 pr-10 text-sm text-slate-100 placeholder:text-slate-500 focus:border-orange-500 focus:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all duration-200 shadow-lg shadow-black/20"
+                    >
+                    <button id="clearBtn" class="absolute inset-y-0 right-2 flex items-center pr-2 hidden">
+                        <div class="flex h-6 w-6 items-center justify-center rounded-full hover:bg-slate-800 transition-colors">
+                            <i data-lucide="x" class="h-3.5 w-3.5 text-slate-500 hover:text-slate-300"></i>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Login / User Info -->
+            <div class="flex shrink-0 items-center justify-end" id="authSection">
+                <!-- Injected via JS -->
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-6 lg:px-8 space-y-10">
+        
+        <!-- Suggestions Area -->
+        <div id="suggestionArea" class="hidden animate-fade-in ml-1">
+            <p class="flex items-center gap-2 text-slate-400">
+                <i data-lucide="sparkles" class="h-4 w-4 text-orange-500"></i>
+                <span>Bunu mu demek istemiştiniz:</span>
+                <button id="suggestionBtn" class="font-bold text-orange-400 hover:text-orange-300 hover:underline italic transition-colors"></button>
+                ?
+            </p>
+        </div>
+
+        <!-- Result Card Area -->
+        <div id="resultArea">
+            <!-- Default State -->
+            <div class="mt-10 flex flex-col items-center justify-center text-center opacity-40">
+                <div class="mb-4 rounded-full bg-slate-900 p-4 border border-slate-800 shadow-[0_0_15px_rgba(249,115,22,0.1)]">
+                    <i data-lucide="search" class="h-10 w-10 text-slate-600"></i>
+                </div>
+                <p class="text-slate-500">Aramak için yukarıya yazmaya başlayın</p>
+            </div>
+        </div>
+
+        <!-- Grid Section -->
+        <section class="animate-slide-up" style="animation-delay: 100ms;">
+            <div class="mb-6 flex items-center justify-between border-b border-slate-800 pb-2">
+                <h2 class="text-xl font-semibold text-white">Sözlük İçeriği (Son Eklenenler)</h2>
+                <span id="gridCount" class="text-sm text-slate-400 bg-slate-900 border border-slate-800 px-2 py-1 rounded-md">0 gösteriliyor</span>
+            </div>
+            <div id="dictionaryGrid" class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+                <!-- Grid Items via JS -->
+            </div>
+        </section>
+
+        <!-- Add Term Section -->
+        <section class="animate-slide-up" style="animation-delay: 200ms;">
+            <div class="mb-6 border-b border-slate-800 pb-2 flex items-center justify-between">
+                <h2 class="text-xl font-semibold text-white">Yeni Veri Ekle</h2>
+                <i id="lockIcon" data-lucide="lock" class="h-4 w-4 text-slate-500"></i>
+            </div>
+            <div id="addTermContainer">
+                <!-- Add Form or Login Prompt via JS -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="w-full border-t border-slate-800/50 bg-slate-950/80 py-6 text-center backdrop-blur-sm mt-auto">
+        <p class="flex items-center justify-center gap-1 text-sm text-slate-500">
+            Created by 
+            <span class="font-semibold text-orange-500 hover:text-orange-400 transition-colors cursor-default">
+                brnalprn
+            </span>
+        </p>
+    </footer>
+
+    <!-- LOGIN MODAL -->
+    <div id="loginModal" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 hidden opacity-0 transition-opacity duration-300">
+        <div class="relative w-full max-w-sm overflow-hidden rounded-xl border border-slate-800 bg-slate-950 shadow-2xl shadow-orange-500/10 scale-95 transition-transform duration-300" id="loginModalContent">
+            <button onclick="toggleLoginModal(false)" class="absolute right-4 top-4 z-10 text-slate-500 hover:text-white">
+                <i data-lucide="x" class="h-5 w-5"></i>
+            </button>
+            
+            <div class="flex border-b border-slate-800">
+                <button class="flex-1 py-4 text-sm font-medium bg-slate-900 text-orange-500 border-b-2 border-orange-500">Giriş Yap</button>
+                <button class="flex-1 py-4 text-sm font-medium bg-slate-950 text-slate-400 cursor-not-allowed opacity-50">Kayıt Ol</button>
+            </div>
+
+            <div class="p-6">
+                <form id="loginForm" class="space-y-4">
+                    <div class="space-y-2">
+                        <label class="text-xs font-medium text-slate-400">Kullanıcı Adı</label>
+                        <div class="relative">
+                            <i data-lucide="user" class="absolute left-3 top-2.5 h-4 w-4 text-slate-500"></i>
+                            <input type="text" id="usernameInput" class="w-full rounded-lg border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-sm text-white focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500" placeholder="admin">
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-xs font-medium text-slate-400">Şifre</label>
+                        <div class="relative">
+                            <i data-lucide="lock" class="absolute left-3 top-2.5 h-4 w-4 text-slate-500"></i>
+                            <input type="password" id="passwordInput" class="w-full rounded-lg border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-sm text-white focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500" placeholder="admin123">
+                        </div>
+                    </div>
+                    <p id="loginError" class="text-xs text-red-500 hidden">Hatalı kullanıcı adı veya şifre!</p>
+                    <button type="submit" class="w-full rounded-lg bg-orange-600 py-2 text-sm font-semibold text-white hover:bg-orange-500 transition-colors shadow-lg shadow-orange-500/20">Giriş Yap</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- APPLICATION LOGIC -->
+    <script>
+        // --- 1. STATE & DATA ---
+        const CONSTANTS = {
+            HIDDEN_KEYS: ["bizde bir birdir"],
+            STORAGE_KEY: 'portaSearch_dictionary_v1',
+            USER_KEY: 'portaSearch_user_v1'
+        };
+
+        const INITIAL_DATA = {
+            "bizde bir birdir": { text: "iki ise ikidir", author: "admin" },
+            "merhaba": { text: "Selam! Size nasıl yardımcı olabilirim?", author: "admin" },
+            "javascript": { text: "Web sayfalarını interaktif hale getiren programlama dili.", author: "admin" },
+            "react": { text: "Kullanıcı arayüzleri oluşturmak için kullanılan bir kütüphane.", author: "admin" },
+            "tailwind": { text: "Hızlı UI geliştirme için utility-first CSS framework.", author: "admin" },
+            "openai": { text: "Yapay zeka araştırma şirketi.", author: "admin" }
+        };
+
+        let state = {
+            searchTerm: '',
+            user: JSON.parse(localStorage.getItem(CONSTANTS.USER_KEY)) || null,
+            dictionary: JSON.parse(localStorage.getItem(CONSTANTS.STORAGE_KEY)) || INITIAL_DATA
+        };
+
+        // --- 2. UTILS ---
+        function getLevenshteinDistance(a, b) {
+            if (a.length === 0) return b.length;
+            if (b.length === 0) return a.length;
+            const matrix = Array.from({ length: b.length + 1 }, () => Array(a.length + 1).fill(0));
+            for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
+            for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
+            for (let j = 1; j <= b.length; j++) {
+                for (let i = 1; i <= a.length; i++) {
+                    const indicator = a[i - 1] === b[j - 1] ? 0 : 1;
+                    matrix[j][i] = Math.min(matrix[j][i - 1] + 1, matrix[j - 1][i] + 1, matrix[j - 1][i - 1] + indicator);
+                }
+            }
+            return matrix[b.length][a.length];
+        }
+
+        function saveDictionary() {
+            localStorage.setItem(CONSTANTS.STORAGE_KEY, JSON.stringify(state.dictionary));
+            renderGrid();
+        }
+
+        function saveUser() {
+            if(state.user) {
+                localStorage.setItem(CONSTANTS.USER_KEY, JSON.stringify(state.user));
+            } else {
+                localStorage.removeItem(CONSTANTS.USER_KEY);
+            }
+            renderHeader();
+            renderAddTerm();
+        }
+
+        // --- 3. RENDERING FUNCTIONS ---
+        
+        // Render Header (User State)
+        function renderHeader() {
+            const container = document.getElementById('authSection');
+            const lockIcon = document.getElementById('lockIcon');
+            
+            if (state.user) {
+                if(lockIcon) lockIcon.style.display = 'none';
+                container.innerHTML = `
+                    <div class="flex items-center gap-3 animate-fade-in">
+                        <div class="flex flex-col items-end hidden md:flex">
+                            <span class="text-sm font-medium text-white">${state.user.username}</span>
+                            <span class="text-[10px] uppercase tracking-wide text-orange-500 font-bold">${state.user.role}</span>
+                        </div>
+                        <button onclick="handleLogout()" class="rounded-full bg-slate-800 p-2 text-slate-400 hover:bg-red-900/20 hover:text-red-500 transition-colors border border-slate-700" title="Çıkış Yap">
+                            <i data-lucide="log-out" class="h-4 w-4"></i>
+                        </button>
+                    </div>
+                `;
+            } else {
+                if(lockIcon) lockIcon.style.display = 'block';
+                container.innerHTML = `
+                    <button onclick="toggleLoginModal(true)" class="flex items-center gap-2 rounded-full bg-slate-900 border border-slate-700 px-5 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white hover:border-orange-500/50 transition-all shadow-sm">
+                        <i data-lucide="log-in" class="h-4 w-4"></i>
+                        <span class="hidden sm:inline">Giriş Yap</span>
+                    </button>
+                `;
+            }
+            lucide.createIcons();
+        }
+
+        // Render Search Results
+        function renderResult() {
+            const container = document.getElementById('resultArea');
+            const term = state.searchTerm.trim().toLowerCase();
+            const suggestionEl = document.getElementById('suggestionArea');
+            
+            // Clear suggestion
+            suggestionEl.classList.add('hidden');
+
+            if (!term) {
+                container.innerHTML = `
+                    <div class="mt-10 flex flex-col items-center justify-center text-center opacity-40">
+                        <div class="mb-4 rounded-full bg-slate-900 p-4 border border-slate-800 shadow-[0_0_15px_rgba(249,115,22,0.1)]">
+                            <i data-lucide="search" class="h-10 w-10 text-slate-600"></i>
+                        </div>
+                        <p class="text-slate-500">Aramak için yukarıya yazmaya başlayın</p>
+                    </div>`;
+                lucide.createIcons();
+                return;
+            }
+
+            // Exact Match
+            const exactMatch = state.dictionary[term];
+
+            // Suggestion Logic
+            if (!exactMatch && !CONSTANTS.HIDDEN_KEYS.includes(term)) {
+                let bestMatch = "";
+                let minDist = Infinity;
+                const visibleKeys = Object.keys(state.dictionary).filter(k => !CONSTANTS.HIDDEN_KEYS.includes(k));
+                
+                visibleKeys.forEach(key => {
+                    const dist = getLevenshteinDistance(term, key);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        bestMatch = key;
+                    }
+                });
+                
+                const maxEdits = term.length <= 4 ? 1 : 3;
+                if (bestMatch && minDist <= maxEdits) {
+                    suggestionEl.classList.remove('hidden');
+                    const btn = document.getElementById('suggestionBtn');
+                    btn.textContent = bestMatch;
+                    btn.onclick = () => {
+                        document.getElementById('searchInput').value = bestMatch;
+                        state.searchTerm = bestMatch;
+                        renderResult();
+                    };
+                }
+            }
+
+            // Easter Egg
+            if (exactMatch && term === "bizde bir birdir") {
+                confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#f97316', '#ffffff', '#000000'] });
+            }
+
+            if (exactMatch) {
+                container.innerHTML = `
+                <div class="animate-slide-up">
+                    <div class="overflow-hidden rounded-xl border border-orange-500/30 bg-slate-900 shadow-[0_0_30px_rgba(249,115,22,0.15)]">
+                        <div class="border-b border-orange-500/20 bg-orange-500/10 px-6 py-4 flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <i data-lucide="check-circle-2" class="h-5 w-5 text-orange-500"></i>
+                                <h2 class="text-sm font-semibold text-orange-400 uppercase tracking-wider">Sonuç Bulundu</h2>
+                            </div>
+                            <div class="flex items-center gap-1.5 rounded-full bg-slate-950/50 px-2.5 py-1 border border-slate-800/50">
+                                <i data-lucide="user-circle-2" class="h-3.5 w-3.5 text-slate-400"></i>
+                                <span class="text-xs font-medium text-slate-300">${exactMatch.author}</span>
+                            </div>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-lg leading-relaxed text-slate-100">${exactMatch.text}</p>
+                        </div>
+                        <div class="bg-slate-950/50 px-6 py-3 border-t border-slate-800">
+                            <p class="text-xs text-slate-500">Aranan terim: <span class="font-medium text-orange-400">"${state.searchTerm}"</span></p>
+                        </div>
+                    </div>
+                </div>`;
+            } else {
+                container.innerHTML = `
+                <div class="animate-slide-up">
+                    <div class="overflow-hidden rounded-xl border border-red-900/50 bg-slate-900 shadow-sm">
+                        <div class="flex items-start gap-4 p-6">
+                            <div class="flex-shrink-0 rounded-full bg-red-950/50 p-2">
+                                <i data-lucide="frown" class="h-6 w-6 text-red-500"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-base font-medium text-slate-200">Sonuç Bulunamadı</h3>
+                                <p class="mt-1 text-slate-400">Aradığınız <strong class="text-slate-300">"${state.searchTerm}"</strong> terimi için kayıt bulunamadı.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }
+            lucide.createIcons();
+        }
+
+        // Render Grid
+        function renderGrid() {
+            const grid = document.getElementById('dictionaryGrid');
+            const keys = Object.keys(state.dictionary)
+                .filter(k => !CONSTANTS.HIDDEN_KEYS.includes(k))
+                .reverse()
+                .slice(0, 4); // Last 4
+            
+            document.getElementById('gridCount').textContent = `${keys.length} gösteriliyor`;
+
+            if (keys.length === 0) {
+                grid.innerHTML = '<div class="col-span-full rounded-lg border border-dashed border-slate-700 bg-slate-900/50 p-8 text-center text-slate-500">Henüz veri yok.</div>';
+                return;
+            }
+
+            grid.innerHTML = keys.map(key => {
+                const item = state.dictionary[key];
+                return `
+                <div class="group relative flex flex-col justify-between overflow-hidden rounded-lg border border-slate-800 bg-slate-900 p-4 shadow-sm transition-all hover:border-orange-500/50 hover:shadow-[0_0_15px_rgba(249,115,22,0.1)] cursor-pointer" onclick="quickSearch('${key}')">
+                    <div>
+                        <div class="flex items-center gap-2 mb-2">
+                            <i data-lucide="book-open" class="h-4 w-4 text-orange-500 opacity-70 group-hover:opacity-100 transition-opacity"></i>
+                            <h3 class="font-semibold text-slate-200 capitalize truncate">${key}</h3>
+                        </div>
+                        <p class="text-sm text-slate-400 line-clamp-3 leading-relaxed">${item.text}</p>
+                    </div>
+                    <div class="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between">
+                        <span class="text-[10px] font-medium text-slate-600 uppercase tracking-widest group-hover:text-orange-500/70">Tanım</span>
+                        <div class="flex items-center gap-1 text-[10px] text-slate-500">
+                            <i data-lucide="user" class="h-3 w-3"></i>
+                            <span>${item.author}</span>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        // Render Add Term Section
+        function renderAddTerm() {
+            const container = document.getElementById('addTermContainer');
+            if (!state.user) {
+                container.innerHTML = `
+                    <div class="rounded-xl border border-dashed border-slate-800 bg-slate-900/50 p-8 text-center">
+                        <p class="text-slate-400 mb-4">Yeni içerik eklemek için lütfen giriş yapın.</p>
+                        <button onclick="toggleLoginModal(true)" class="px-4 py-2 rounded-lg bg-slate-800 text-sm font-medium text-white hover:bg-slate-700 hover:text-orange-400 transition-colors">
+                            Giriş Yap
+                        </button>
+                    </div>`;
+            } else {
+                container.innerHTML = `
+                    <div class="rounded-xl border border-slate-800 bg-slate-900 p-6 shadow-lg shadow-black/20" id="addFormBox">
+                        <button onclick="toggleAddForm(true)" id="showAddFormBtn" class="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-700 py-8 text-slate-500 hover:border-orange-500 hover:text-orange-500 hover:bg-slate-800/50 transition-all duration-300">
+                            <i data-lucide="plus" class="h-6 w-6"></i>
+                            <span class="font-medium">Yeni Kayıt Ekle</span>
+                        </button>
+                        <form id="actualAddForm" class="space-y-4 hidden" onsubmit="handleAddSubmit(event)">
+                            <div class="grid gap-4 md:grid-cols-2">
+                                <div class="space-y-2">
+                                    <label class="text-sm font-medium text-slate-300">Anahtar Kelime</label>
+                                    <input name="key" type="text" placeholder="Örn: Yapay Zeka" class="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500" required>
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="text-sm font-medium text-slate-300">Açıklama</label>
+                                    <input name="value" type="text" placeholder="Açıklama giriniz..." class="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500" required>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-end gap-3 pt-2">
+                                <button type="button" onclick="toggleAddForm(false)" class="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800 rounded-md">İptal</button>
+                                <button type="submit" class="flex items-center gap-2 rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 shadow-[0_0_15px_rgba(234,88,12,0.3)]">
+                                    <i data-lucide="save" class="h-4 w-4"></i> Kaydet
+                                </button>
+                            </div>
+                        </form>
+                    </div>`;
+            }
+            lucide.createIcons();
+        }
+
+        // --- 4. EVENT HANDLERS ---
+        
+        function quickSearch(term) {
+            document.getElementById('searchInput').value = term;
+            state.searchTerm = term;
+            renderResult();
+            document.getElementById('clearBtn').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function toggleAddForm(show) {
+            const btn = document.getElementById('showAddFormBtn');
+            const form = document.getElementById('actualAddForm');
+            if (show) {
+                btn.classList.add('hidden');
+                form.classList.remove('hidden');
+                form.classList.add('animate-fade-in');
+            } else {
+                btn.classList.remove('hidden');
+                form.classList.add('hidden');
+            }
+        }
+
+        function handleAddSubmit(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const key = formData.get('key').toString().trim();
+            const val = formData.get('value').toString().trim();
+            
+            if (key && val) {
+                state.dictionary[key.toLowerCase()] = {
+                    text: val,
+                    author: state.user.username
+                };
+                saveDictionary();
+                toggleAddForm(false);
+                // Highlight success
+                quickSearch(key);
+            }
+        }
+
+        function toggleLoginModal(show) {
+            const modal = document.getElementById('loginModal');
+            const content = document.getElementById('loginModalContent');
+            const errorMsg = document.getElementById('loginError');
+            
+            errorMsg.classList.add('hidden');
+            document.getElementById('loginForm').reset();
+
+            if (show) {
+                modal.classList.remove('hidden');
+                // Trigger reflow for animation
+                void modal.offsetWidth;
+                modal.classList.remove('opacity-0');
+                content.classList.remove('scale-95');
+                content.classList.add('scale-100');
+            } else {
+                modal.classList.add('opacity-0');
+                content.classList.remove('scale-100');
+                content.classList.add('scale-95');
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                }, 300);
+            }
+        }
+
+        function handleLogout() {
+            state.user = null;
+            saveUser();
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const u = document.getElementById('usernameInput').value;
+            const p = document.getElementById('passwordInput').value;
+
+            // Simple Auth Logic
+            if ((u === 'admin' && p === 'admin123') || (u.length > 2 && p.length > 2)) {
+                state.user = {
+                    username: u,
+                    role: (u === 'admin' && p === 'admin123') ? 'admin' : 'user'
+                };
+                saveUser();
+                toggleLoginModal(false);
+            } else {
+                document.getElementById('loginError').classList.remove('hidden');
+            }
+        });
+
+        // Search Input Logic
+        const searchInput = document.getElementById('searchInput');
+        const clearBtn = document.getElementById('clearBtn');
+
+        searchInput.addEventListener('input', (e) => {
+            state.searchTerm = e.target.value;
+            if (state.searchTerm) {
+                clearBtn.classList.remove('hidden');
+            } else {
+                clearBtn.classList.add('hidden');
+            }
+            renderResult();
+        });
+
+        clearBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            state.searchTerm = '';
+            clearBtn.classList.add('hidden');
+            renderResult();
+            searchInput.focus();
+        });
+
+        // --- INIT ---
+        window.addEventListener('DOMContentLoaded', () => {
+            renderHeader();
+            renderResult(); // Renders empty state
+            renderGrid();
+            renderAddTerm();
+            lucide.createIcons();
+        });
+
+    </script>
+</body>
 </html>
